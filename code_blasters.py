@@ -5,7 +5,14 @@ import math
 # It uses the standard input to place data into the game variables such as x and y.
 # YOU DO NOT NEED TO MODIFY THE INITIALIZATION OF THE GAME VARIABLES.
 
+def outside_range(val, lower, upper):
+    return val > upper or val < lower;
+
+def inside_range(val, lower, upper):
+    return val < upper and val > lower;
+
 first_run = True;
+boost_used = False;
 
 # Position
 prev_x = 0;
@@ -64,15 +71,20 @@ while True:
         opponent_v_x = 0;
         opponent_v_y = 0;
         opponent_v_sum = 0;
+        opponent_v_angle = 0;
     else:
         v_x = x - prev_x;
         v_y = y - prev_y;
         v_sum = math.sqrt( (v_x - prev_v_x)**2 + (v_x - prev_v_x)**2 );
-        v_angle = math.arctan(v_y/v_x);
+        if v_x == 0:
+            v_x = 0.0001;
+        v_angle =  math.atan(v_y/v_x);
         opponent_v_x = opponent_x - prev_opponent_x;
         opponent_v_y = opponent_y - prev_opponent_y;
-        opponent_v_sum = math.sqrt( (opponent_v_x - prev_opponent_v_x)**2 + (v_x - prev_opponent_v_x)**2 );;
-        opponent_v_angle = math.arctan(opponent_v_y/opponent_v_x);
+        opponent_v_sum = math.sqrt( (opponent_v_x - prev_opponent_v_x)**2 + (v_y - prev_opponent_v_y)**2 );
+        if opponent_v_x == 0:
+            opponent_v_x = 0.0001;
+        opponent_v_angle = math.atan(opponent_v_y/opponent_v_x);
 
     # Calculate opponent distance
     opponent_dist = math.sqrt( (x - opponent_x)**2 + (y - opponent_y)**2 );
@@ -83,51 +95,63 @@ while True:
         dist_state = 2; # Close
     elif next_checkpoint_dist < 1000:
         dist_state = 1; # Almost there
-    else
+    else:
         dist_state = 0; # Far away
 
     # Angle State
     if outside_range(next_checkpoint_angle, -90, 90):
         angle_state = 3; # Beyond
     elif outside_range(next_checkpoint_angle, -75, 75):
-        angle_state = 2;
+        angle_state = 2; # Off Target
     elif outside_range(next_checkpoint_angle, -45, 45):
-        angle_state = 1;
+        angle_state = 1; # Close
     else:
-        angle_state = 0;
+        angle_state = 0; # On Target
 
     # Opponent state
     if opponent_dist < 400:
         opponent_state = 2; # Hit
-    elif opponent_dist < 600;
+    elif opponent_dist < 600:
         opponent_state = 1; # Close by
     else:
         opponent_state = 0; # Not a real problem
-        
-    # First see if we are at a bad angle
-    # This is 'beyond' the checkpoint, should stop going forward...
-    if next_checkpoint_angle > 90 or next_checkpoint_angle < -90:
-        bad_angle = True;
-        thrust = 0;
-    elif next_checkpoint_angle > 75 or next_checkpoint_angle < -75:
-        thrust = 90;
-    else:
+
+    # Now to determine the thrust based on y = m*x + b:
+        # Distance to checkpoint is most important
+            # Set it's initial offset (b)
+    if dist_state == 0:
         thrust = 100;
-        
-    # Then check to see if we are close to the checkpoint
-    # and slow down to reduce overshooting
-    if next_checkpoint_dist < 300 and not bad_angle:
-        thrust = 30;    
-    elif next_checkpoint_dist < 1000 and not bad_angle:
+    elif dist_state == 1:
         thrust = 75;
+    elif dist_state == 2:
+        thrust = 50;
+    else:
+        thrust = 50;
+
+        # Angle towards next checkpoint is next priority
+            # Fine-tune scaling (m)
+    if angle_state == 0:
+        thrust = thrust * (1 + 0.15);
+    elif angle_state == 1:
+        thrust = thrust * (1 + 0.00);
+    elif angle_state == 2:
+        thrust = thrust * (1 - 0.15);
+    elif angle_state == 3:
+        thrust = 0;
+    else:
+        thrust = thrust;
         
     if opponent_dist < 400 and thrust > 50:
         thrust = 50;
+
+    if thrust > 100:
+        thrust = 100;
     
-    if next_checkpoint_angle < 10 and next_checkpoint_angle > -10 and next_checkpoint_dist > 4000:
+    if angle_state == 0 and next_checkpoint_dist > 3000 and not boost_used:
         power = " BOOST";
+        boost_used = True;
     else:
-        power = " " + str(thrust);
+        power = " " + str(int(thrust));
     
 
     # Edit this line to output the target position
@@ -166,9 +190,3 @@ while True:
     
     # No longer the first run
     first_run = False;
-
-def outside_range(val, lower, upper):
-    return val > upper or val < lower;
-
-def inside_range(val, lower, upper):
-    return val < upper and val > lower;
