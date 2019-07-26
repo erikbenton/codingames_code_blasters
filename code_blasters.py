@@ -21,6 +21,9 @@ prev_checkpoint_y = 0;
 prev_checkpoint_dist = 0;
 prev_opponent_dist = 0;
 
+dist_state = 0; # 0 is Far, 1 is Med, 2 is Close
+opponent_state = 0; # 0 is Far, 1 is Close
+
 # Velocities
 prev_v_x = 0;
 prev_v_y = 0;
@@ -34,6 +37,9 @@ prev_opponent_v_sum = 0;
 prev_v_angle = 0;
 prev_opponent_v_angle = 0;
 prev_checkpoint_angle = 0;
+
+angle_state = 0; # 0 is Head On, 1 is Close, 2 is Off Target, 3 is Beyond
+
 
 # game loop
 while True:
@@ -71,22 +77,53 @@ while True:
     # Calculate opponent distance
     opponent_dist = math.sqrt( (x - opponent_x)**2 + (y - opponent_y)**2 );
     
+    # Determine what state the ship is in
+    # Distance State
+    if next_checkpoint_dist < 300:
+        dist_state = 2; # Close
+    elif next_checkpoint_dist < 1000:
+        dist_state = 1; # Almost there
+    else
+        dist_state = 0; # Far away
+
+    # Angle State
+    if outside_range(next_checkpoint_angle, -90, 90):
+        angle_state = 3; # Beyond
+    elif outside_range(next_checkpoint_angle, -75, 75):
+        angle_state = 2;
+    elif outside_range(next_checkpoint_angle, -45, 45):
+        angle_state = 1;
+    else:
+        angle_state = 0;
+
+    # Opponent state
+    if opponent_dist < 400:
+        opponent_state = 2; # Hit
+    elif opponent_dist < 600;
+        opponent_state = 1; # Close by
+    else:
+        opponent_state = 0; # Not a real problem
+        
+    # First see if we are at a bad angle
+    # This is 'beyond' the checkpoint, should stop going forward...
     if next_checkpoint_angle > 90 or next_checkpoint_angle < -90:
         bad_angle = True;
         thrust = 0;
+    elif next_checkpoint_angle > 75 or next_checkpoint_angle < -75:
+        thrust = 90;
     else:
-        bad_angle = False;
         thrust = 100;
         
-    if next_checkpoint_dist < 5 and not bad_angle:
-        thrust = 5;    
-    # elif next_checkpoint_dist < 100 and not bad_angle:
-    #     thrust = 25;
-    elif next_checkpoint_dist < 250 and not bad_angle:
-        thrust = 50;
+    # Then check to see if we are close to the checkpoint
+    # and slow down to reduce overshooting
+    if next_checkpoint_dist < 300 and not bad_angle:
+        thrust = 30;    
     elif next_checkpoint_dist < 1000 and not bad_angle:
         thrust = 75;
         
+    if opponent_dist < 400 and thrust > 50:
+        thrust = 50;
+    
     if next_checkpoint_angle < 10 and next_checkpoint_angle > -10 and next_checkpoint_dist > 4000:
         power = " BOOST";
     else:
@@ -123,11 +160,15 @@ while True:
     prev_opponent_v_sum = opponent_v_sum;
     
     # Angles
-    prev_checkpoint_angle = next_checkpoint_angle;
     prev_v_angle = v_angle;
+    prev_checkpoint_angle = next_checkpoint_angle;
     prev_opponent_v_angle = opponent_v_angle;
     
     # No longer the first run
     first_run = False;
 
-def determine
+def outside_range(val, lower, upper):
+    return val > upper or val < lower;
+
+def inside_range(val, lower, upper):
+    return val < upper and val > lower;
