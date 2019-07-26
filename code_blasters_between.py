@@ -11,19 +11,8 @@ def outside_range(val, lower, upper):
 def inside_range(val, lower, upper):
     return val < upper and val > lower;
 
-# Bools for determining states
 first_run = True;
 boost_used = False;
-shield_used = 0; # Number of turns to wait
-
-# Keeps track of turns for shield
-turn_counter = 0;
-
-# States
-dist_state = 0; # 0 is Far, 1 is Med, 2 is Close
-opponent_state = 0; # 0 is Far, 1 is Close
-angle_state = 0; # 0 is Head On, 1 is Close, 2 is Off Target, 3 is Beyond
-power_state = 0; # 0 is calc'd thrust, 1 is BOOST, 2 is SHIELD
 
 # Position
 prev_x = 0;
@@ -39,6 +28,9 @@ prev_checkpoint_y = 0;
 prev_checkpoint_dist = 0;
 prev_opponent_dist = 0;
 
+dist_state = 0; # 0 is Far, 1 is Med, 2 is Close
+opponent_state = 0; # 0 is Far, 1 is Close
+
 # Velocities
 prev_v_x = 0;
 prev_v_y = 0;
@@ -52,6 +44,9 @@ prev_opponent_v_sum = 0;
 prev_v_angle = 0;
 prev_opponent_v_angle = 0;
 prev_checkpoint_angle = 0;
+
+angle_state = 0; # 0 is Head On, 1 is Close, 2 is Off Target, 3 is Beyond
+
 
 # game loop
 while True:
@@ -81,13 +76,13 @@ while True:
         v_x = x - prev_x;
         v_y = y - prev_y;
         v_sum = math.sqrt( (v_x - prev_v_x)**2 + (v_x - prev_v_x)**2 );
-        if v_x == 0: # Check for div by 0
+        if v_x == 0:
             v_x = 0.0001;
         v_angle =  math.atan(v_y/v_x);
         opponent_v_x = opponent_x - prev_opponent_x;
         opponent_v_y = opponent_y - prev_opponent_y;
         opponent_v_sum = math.sqrt( (opponent_v_x - prev_opponent_v_x)**2 + (v_y - prev_opponent_v_y)**2 );
-        if opponent_v_x == 0: # Check for div by 0
+        if opponent_v_x == 0:
             opponent_v_x = 0.0001;
         opponent_v_angle = math.atan(opponent_v_y/opponent_v_x);
 
@@ -145,40 +140,19 @@ while True:
         thrust = 0;
     else:
         thrust = thrust;
-    
-    # Check to see if boost should used
-    if first_run:
-        power_state = 1;
-        boost_used = True;
-    elif opponent_state == 1 and shield_used == 0:
-        power_state == 2;
-        shield_used = 4;
-    elif opponent_state == 2 and thrust > 50:
-        power_state = 0;
-        thrust = 50; 
-    # elif angle_state == 0 and next_checkpoint_dist > 3000 and not boost_used:
-    #     power_state == 1;
-    #     boost_used = True;
-    else:
-        power_state == 0;
+        
+    if opponent_dist < 400 and thrust > 50:
+        thrust = 50;
 
-    # Make sure that the thrust is below the limit
     if thrust > 100:
         thrust = 100;
-
-    # Decide the power output based on the power state
-    if power_state == 0:
-        power = " " + str(int(thrust));
-    elif power_state == 1:
+    
+    if angle_state == 0 and next_checkpoint_dist > 3000 and not boost_used:
         power = " BOOST";
-    elif power_state == 2:
-        power = " SHIELD";
+        boost_used = True;
     else:
         power = " " + str(int(thrust));
-
-    # If the shield was used, update
-    if shield_used > 0:
-        shield_used = shield_used - 1;
+    
 
     # Edit this line to output the target position
     # and thrust (0 <= thrust <= 100)
