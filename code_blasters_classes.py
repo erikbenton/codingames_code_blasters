@@ -53,11 +53,15 @@ class Pod:
         self.targets_x = [];
         self.targets_y = [];
         self.current_target_id = 0;
+        self.next_target_id = 0;
         self.current_target = [0,0];
+        self.number_laps = 0;
 
         # Angle
         self.angle = 0;
         self.theta_d = 0;
+        self.theta_d_next = 0;
+        self.theta_v = 0;
 
         # Overalls
         self.distance = 0;
@@ -95,11 +99,12 @@ class Pod:
 
         self.angle_prev = 0;
         self.theta_d_prev = 0;
+        self.thrust_d_prev = 0;
+        self.theta_v_prev = 0;
 
         self.distance_prev = 0;
         self.thrust_prev = 0;
         self.power_prev = "0";
-        self.thrust_d_prev = 0;
         self.x_out_prev = 0;
         self.y_out_prev = 0;
 
@@ -148,6 +153,7 @@ class Pod:
         self.thrust_prev = self.thrust;
         self.power_prev = self.power;
         self.thrust_d_prev = self.thrust_d;
+        self.thrust_v_prev = self.theta_v;
 
         x_ind = 0;
         y_ind = 1;
@@ -162,6 +168,7 @@ class Pod:
         self.vy = input_list[vy_ind];
         self.angle = input_list[ang_ind];
         self.current_target_id = input_list[id_ind];
+        self.next_target_id = (self.current_target_id + 1)%self.number_laps;
 
         # First figure out what's happening with the pod
         # Calc what wasn't given
@@ -191,7 +198,7 @@ class Pod:
         self.theta_d = self.calc_vector_theta((self.current_target[0] - self.x), (self.current_target[1] - self.y));
 
     def calc_desired_thrust(self):
-        far_away = 4000;
+        far_away = 2000;
         scale_factor = 200/math.pi;
         stretch_factor = 0.002;
         approach_dist = 100;
@@ -210,14 +217,29 @@ class Pod:
 
     def calc_desired_outputs(self):
 
-        if self.distance < 1000:
-            self.x_out = self.x + self.current_target[0] - self.x - self.vx;
-            self.y_out = self.y + self.current_target[1] - self.y - self.vy;
-        else:
-            self.x_out = self.x + self.ax_d - self.ax;
-            self.y_out = self.y + self.ay_d - self.ay;
-            
+        # if self.distance > 1000:
+        #     # Momentum control
+        #     self.x_out = self.x + self.current_target[0] - self.x - self.vx;
+        #     self.y_out = self.y + self.current_target[1] - self.y - self.vy;
+
+        #     # Force control
+        #     # self.x_out = self.x + self.ax_d - self.ax;
+        #     # self.y_out = self.y + self.ay_d - self.ay;
+        # else:
+        #     self.x_out = self.current_target[0];
+        #     self.y_out = self.current_target[1];
+
+        self.x_out = self.x + self.current_target[0] - self.x - self.vx;
+        self.y_out = self.y + self.current_target[1] - self.y - self.vy;
         self.thrust = self.calc_vector_mag(self.ax_d, self.ay_d);
+
+        # Preemptive Turning for next checkpoint
+        # Check to see if pod is close and on target
+        # print("NEXT: " + str(self.distance) + ", " + str(self.check_on_target()), file=sys.stderr);
+        if self.distance < 2500 and self.check_on_target(): 
+            self.x_out = int(self.targets_x[self.next_target_id]);
+            self.y_out = int(self.targets_y[self.next_target_id]);
+            self.thrust = 0;            
 
         if self.thrust > 100:
             self.thrust = 100;
@@ -236,6 +258,20 @@ class Pod:
         self.mag_Fd = self.calc_vector_mag(self.ax_d, self.ay_d);
         self.theta_Fd = self.calc_vector_theta(self.ax_d, self.ay_d);
 
+    def check_on_target(self):
+        # Calc the angle for the next checkpoint versus current velocity
+        self.theta_v = self.calc_vector_theta(self.vx, self.vy);
+
+        # Calc the next checkpoint angle
+        self.theta_d_next = self.calc_vector_theta(self.targets_x[self.next_target_id], self.targets_y[self.next_target_id]);
+
+        # Absolute diff between the two angles
+        theta_diff = math.sqrt((self.theta_v - self.theta_d)**2);
+
+        # print("ON TARG: " + str(self.theta_v) + ", " + str(self.theta_d_next) + ", " + str(theta_diff), file=sys.stderr);
+
+        return (theta_diff < 18);
+
     def say_something(self):
         return "Listen!";
 
@@ -250,7 +286,12 @@ pod2 = Pod();
 pods = [pod1, pod2];
 
 laps = int(input())
+
+pods[0].number_laps = laps;
+pods[1].number_laps = laps;
+
 checkpoint_count = int(input())
+
 for i in range(checkpoint_count):
     checkpoint_x, checkpoint_y = [int(j) for j in input().split()]
     pods[0].targets_x.append(checkpoint_x);
@@ -290,14 +331,14 @@ while True:
         
     
     if firstRun:
-        print(str(int(pods[0].thrust_d)) + ", " + str(int(pods[0].theta_d)) + ", " + str(int(pods[0].angle)), file=sys.stderr);
-        print(str(int(pods[1].thrust_d)) + ", " + str(int(pods[1].theta_d)) + ", " + str(int(pods[1].angle)), file=sys.stderr);
+        print(str(pods[0].distance), file=sys.stderr);
+        print(str(pods[1].distance), file=sys.stderr);
         # print(str(0) + " " + str(0) + " 0");
         print(str(int(pods[0].x_out)) + " " + str(int(pods[0].y_out)) + " BOOST");
         print(str(int(pods[1].x_out)) + " " + str(int(pods[1].y_out)) + " BOOST");
     else:
-        print(str(int(pods[0].thrust_d)) + ", " + str(int(pods[0].theta_d)) + ", " + str(int(pods[0].angle)) + " " +str(math.degrees(math.atan2(-1 * pods[0].y, -1 * pods[0].x))), file=sys.stderr);
-        print(str(int(pods[1].thrust_d)) + ", " + str(int(pods[1].theta_d)) + ", " + str(int(pods[1].angle)), file=sys.stderr);
+        print(str(pods[0].distance), file=sys.stderr);
+        print(str(pods[1].distance), file=sys.stderr);
         # print(str(0) + " " + str(0) + " 0");
         if pods[0].thrust_d > 100:
             text = " " + str(int(100));
