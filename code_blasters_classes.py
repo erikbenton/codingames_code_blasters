@@ -118,9 +118,35 @@ class Pod:
 
         return math.atan2(y,x);
 
-    def update_pod(self, input_list):
+
+    def update_pod(self, inputs):
         
         # Update the prev values
+        self.update_prevs();
+
+        # Read in new inputs
+        self.new_input(inputs);
+
+        # First figure out what's happening with the pod
+        # Calc what wasn't given
+        self.update_accelerations();
+        self.update_Fp();
+
+        # Now figure out where target is and how to get there
+        # First find target
+        self.update_target_positions();
+
+        # Then orient to the target
+        self.update_target_locations();
+
+        # Determine the desired thrust
+        self.calc_desired_thrust();
+        self.calc_desired_accelerations();
+
+        # Determine what new inputs would make current course the desired course
+        self.calc_desired_outputs();
+
+    def update_prevs(self):
         self.x_prev = self.x;
         self.vx_prev =self.vx;
         self.ax_prev =self.ax;
@@ -154,7 +180,8 @@ class Pod:
         self.power_prev = self.power;
         self.thrust_d_prev = self.thrust_d;
         self.thrust_v_prev = self.theta_v;
-
+    
+    def new_inputs(self, input_list):
         x_ind = 0;
         y_ind = 1;
         vx_ind = 2;
@@ -170,32 +197,15 @@ class Pod:
         self.current_target_id = input_list[id_ind];
         self.next_target_id = (self.current_target_id + 1)%self.number_laps;
 
-        # First figure out what's happening with the pod
-        # Calc what wasn't given
-        self.update_accelerations();
-        self.update_Fp();
-
-        # Now figure out where target is and how to get there
-        # First find target
-        self.update_target_positions();
-
-        # Then orient to the target
-        self.update_target_locations();
-
-        # Determine the desired thrust
-        self.calc_desired_thrust();
-        self.calc_desired_accelerations();
-
-        # Determine what new inputs would make current course the desired course
-        self.calc_desired_outputs();
-
     def update_target_positions(self):
         self.current_target[0] = self.targets_x[self.current_target_id];
         self.current_target[1] = self.targets_y[self.current_target_id];
 
     def update_target_locations(self):
-        self.distance = self.calc_vector_mag((self.current_target[0] - self.x), (self.current_target[1] - self.y));
-        self.theta_d = self.calc_vector_theta((self.current_target[0] - self.x), (self.current_target[1] - self.y));
+        x_diff = self.current_target[0] - self.x;
+        y_diff = self.current_target[1] - self.y
+        self.distance = self.calc_vector_mag(x_diff, y_diff);
+        self.theta_d = self.calc_vector_theta(x_diff, y_diff);
 
     def calc_desired_thrust(self):
         far_away = 2000;
@@ -236,7 +246,7 @@ class Pod:
         # Preemptive Turning for next checkpoint
         # Check to see if pod is close and on target
         # print("NEXT: " + str(self.distance) + ", " + str(self.check_on_target()), file=sys.stderr);
-        if self.distance < 2500 and self.check_on_target(): 
+        if self.distance < 1500 and self.check_on_target(): 
             self.x_out = int(self.targets_x[self.next_target_id]);
             self.y_out = int(self.targets_y[self.next_target_id]);
             self.thrust = 0;            
