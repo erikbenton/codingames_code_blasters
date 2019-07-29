@@ -209,9 +209,16 @@ class Pod:
         self.ay_d = self.thrust_d * math.sin(self.theta_d);
 
     def calc_desired_outputs(self):
-        self.x_out = self.x + self.current_target[0] - self.x - self.vx;
-        self.y_out = self.y + self.current_target[1] - self.y - self.vy;
+
+        if self.distance < 1000:
+            self.x_out = self.x + self.current_target[0] - self.x - self.vx;
+            self.y_out = self.y + self.current_target[1] - self.y - self.vy;
+        else:
+            self.x_out = self.x + self.ax_d - self.ax;
+            self.y_out = self.y + self.ay_d - self.ay;
+            
         self.thrust = self.calc_vector_mag(self.ax_d, self.ay_d);
+
         if self.thrust > 100:
             self.thrust = 100;
 
