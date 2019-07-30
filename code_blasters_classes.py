@@ -3,7 +3,7 @@ import math
 
 class Pod:
 
-    def __init__(self):
+    def __init__(self, attitude):
 
         # X components
         # Current
@@ -70,6 +70,8 @@ class Pod:
         self.thrust_d = 0;
         self.x_out = 0;
         self.y_out = 0;
+        self.num_turns = 0;
+        self.personality = attitude;
         
         # Prev Values
         self.x_prev = 0;
@@ -118,14 +120,20 @@ class Pod:
 
         return math.atan2(y,x);
 
+    def update_pod(self, input_list):
+        self.num_turns = self.num_turns + 1;
+        if self.personality == 0:
+            self.update_pod_racer(input_list);
+        elif self.personality == 1:
+            self.update_pod_defender(input_list);
 
-    def update_pod(self, inputs):
+    def update_pod_racer(self, inputs):
         
         # Update the prev values
         self.update_prevs();
 
         # Read in new inputs
-        self.new_input(inputs);
+        self.new_inputs(inputs);
 
         # First figure out what's happening with the pod
         # Calc what wasn't given
@@ -141,6 +149,33 @@ class Pod:
 
         # Determine the desired thrust
         self.calc_desired_thrust();
+        self.calc_desired_accelerations();
+
+        # Determine what new inputs would make current course the desired course
+        self.calc_desired_outputs();
+
+    def update_pod_defender(self, inputs):
+        
+        # Update the prev values
+        self.update_prevs();
+
+        # Read in new inputs
+        self.new_inputs_defender(inputs);
+
+        # First figure out what's happening with the pod
+        # Calc what wasn't given
+        self.update_accelerations();
+        self.update_Fp();
+
+        # Now figure out where target is and how to get there
+        # First find target
+        self.update_target_positions();
+
+        # Then orient to the target
+        self.update_target_locations();
+
+        # Determine the desired thrust
+        self.calc_desired_thrust_defender();
         self.calc_desired_accelerations();
 
         # Determine what new inputs would make current course the desired course
@@ -197,6 +232,24 @@ class Pod:
         self.current_target_id = input_list[id_ind];
         self.next_target_id = (self.current_target_id + 1)%self.number_laps;
 
+    def new_inputs_defender(self, input_list):
+        x_ind = 0;
+        y_ind = 1;
+        vx_ind = 2;
+        vy_ind = 3;
+        ang_ind = 4;
+        id_ind = 5;
+
+        self.x = input_list[x_ind];
+        self.y = input_list[y_ind];
+        self.vx = input_list[vx_ind];
+        self.vy = input_list[vy_ind];
+        self.angle = input_list[ang_ind];
+        self.current_target_id = int(len(self.targets_x) - 1);
+        self.next_target_id = int(len(self.targets_x) - 1);
+
+        print("DFNDR: " + str(input_list[-1]) + ", " + str(self.next_target_id), file=sys.stderr);
+
     def update_target_positions(self):
         self.current_target[0] = self.targets_x[self.current_target_id];
         self.current_target[1] = self.targets_y[self.current_target_id];
@@ -209,15 +262,30 @@ class Pod:
 
     def calc_desired_thrust(self):
         far_away = 2000;
-        scale_factor = 200/math.pi;
+        scale_factor = 100/math.pi;# 200/math.pi;
         stretch_factor = 0.002;
-        approach_dist = 100;
-        base = 50;
+        approach_dist = 1200;# 100;
+        base = 55;
 
         if self.distance > far_away:
             self.thrust_d = 100;
         elif self.distance > approach_dist:
             self.thrust_d = (100 * (self.distance/(far_away - approach_dist)) - base) + base;# scale_factor * math.atan(stretch_factor*(self.distance - approach_dist)) + base;
+            # self.thrust_d = scale_factor * math.atan(stretch_factor*(self.distance - approach_dist)) + base;
+        else:
+            self.thrust_d = base;
+
+    def calc_desired_thrust_defender(self):
+        far_away = 2000;
+        scale_factor = 100/math.pi;# 200/math.pi;
+        stretch_factor = 0.002;
+        approach_dist = 300;# 100;
+        base = 55;
+
+        if self.distance > far_away:
+            self.thrust_d = 100;
+        elif self.distance > approach_dist:
+            self.thrust_d = 75;
         else:
             self.thrust_d = base;
 
@@ -250,6 +318,17 @@ class Pod:
             self.x_out = int(self.targets_x[self.next_target_id]);
             self.y_out = int(self.targets_y[self.next_target_id]);
             self.thrust = 0;            
+
+        if self.thrust_d > 100:
+            self.thrust_d = 100;
+
+        self.power = " " + str(int(self.thrust_d));
+
+    def calc_desired_outputs_defender(self):
+
+        # Force control
+        self.x_out = self.x + self.ax_d - self.ax;
+        self.y_out = self.y + self.ay_d - self.ay;      
 
         if self.thrust > 100:
             self.thrust = 100;
@@ -291,8 +370,8 @@ class Pod:
 
 firstRun = True;
 
-pod1 = Pod();
-pod2 = Pod();
+pod1 = Pod(0);
+pod2 = Pod(1);
 pods = [pod1, pod2];
 
 laps = int(input())
