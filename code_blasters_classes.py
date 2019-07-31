@@ -271,6 +271,7 @@ class Pod:
             self.thrust_d = 100;
         elif self.distance > approach_dist:
             self.thrust_d = (100 * (self.distance/(far_away - approach_dist)) - base) + base;# scale_factor * math.atan(stretch_factor*(self.distance - approach_dist)) + base;
+            print("THRUST: " + str(self.distance) + ", " + str(self.thrust_d), file=sys.stderr);
             # self.thrust_d = scale_factor * math.atan(stretch_factor*(self.distance - approach_dist)) + base;
         else:
             self.thrust_d = base;
@@ -313,11 +314,12 @@ class Pod:
 
         # Preemptive Turning for next checkpoint
         # Check to see if pod is close and on target
-        # print("NEXT: " + str(self.distance) + ", " + str(self.check_on_target()), file=sys.stderr);
-        if self.distance < 1500 and self.check_on_target(): 
+        print("NEXT: " + str(self.distance) + ", " + str(self.check_on_target()) + ", " + str(self.calc_vector_mag(self.vx, self.vy)), file=sys.stderr);
+        if self.distance < 2000 and self.check_on_target() and self.calc_vector_mag(self.vx, self.vy)  > 100: 
             self.x_out = int(self.targets_x[self.next_target_id]);
             self.y_out = int(self.targets_y[self.next_target_id]);
-            self.thrust = 0;            
+            self.thrust_d = 0;
+            print("YAY!", file=sys.stderr);            
 
         if self.thrust_d > 100:
             self.thrust_d = 100;
@@ -371,7 +373,7 @@ class Pod:
 firstRun = True;
 
 pod1 = Pod(0);
-pod2 = Pod(1);
+pod2 = Pod(0);
 pods = [pod1, pod2];
 
 laps = int(input())
