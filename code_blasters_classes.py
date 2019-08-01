@@ -79,6 +79,7 @@ class Pod:
 
         # For pre-emptive turning
         self.turning_theta = 0
+        self.facing_theta = 0;
         self.turns_next_target = 0
         self.turns_hit_target = 0
         self.rotation_limit = math.radians(18);
@@ -367,6 +368,25 @@ class Pod:
         if self.thrust_d > 100:
             self.thrust_d = 100
 
+        # If we aren't able to move towards the target
+        if (self.turning_theta - self.rotation_limit) > math.radians(90):
+            # Figure out angle displacement from the next target
+            self.calc_facing_theta()
+
+            # If we are far away
+            if self.distance > 2000:
+                # Are we aren't facing in the right direction
+                if self.facing_theta > self.rotation_limit:
+                    # Slow down
+                    self.thrust_d = self.thrust_d * 0.50;
+            else:
+                if self.thrust_d > 5:
+                    self.thrust_d = 5;
+            print("w00+!", file=sys.stderr)
+
+        self.calc_facing_theta()
+        self.which_way_turn()
+
         self.power = " " + str(int(self.thrust_d))
 
     def calc_desired_outputs_defender(self):
@@ -438,6 +458,44 @@ class Pod:
 
         # Angle between (pod, current target, next target)
         self.turning_theta = math.acos(np.inner(a,b)/(self.distance*mag_np))
+
+    def calc_facing_theta(self):
+        # Get the displacements from the next target
+        x_diff = self.current_target[0] - self.x
+        y_diff = self.current_target[1] - self.y
+
+        # Set up vectors for math
+        a = [math.cos(math.radians(self.angle)), math.sin(math.radians(self.angle))]
+        b = [x_diff, y_diff]
+
+        # Angle between (pod, current target, next target)
+        if self.v_mag == 0 or self.distance == 0:
+            self.facing_theta = 0;
+        else:
+            self.facing_theta = math.acos(np.inner(a,b)/(self.distance*self.v_mag))
+
+    def which_way_turn(self):
+        # Get the displacements from the next target
+        x_diff_pod = self.current_target[0] - self.x
+        y_diff_pod = self.current_target[1] - self.y
+
+        x_diff_targets = self.next_target[0] - self.current_target[0]
+        y_diff_targets = self.next_target[1] - self.current_target[1]
+
+        theta_np = self.calc_vector_theta(x_diff_targets, y_diff_targets)
+
+        a = [x_diff_pod, y_diff_pod]
+        b = [x_diff_targets, y_diff_targets]
+
+        turning_angle = theta_np - self.facing_theta
+
+        turning_sign = np.cross(a,b)
+
+        if turning_sign > 0:
+            print("Left " + str(math.degrees(theta_np)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
+        else:
+            print("Right " + str(math.degrees(theta_np)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
+
 
     def say_something(self):
         return "Listen!"
