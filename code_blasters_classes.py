@@ -1,5 +1,6 @@
 import sys
 import math
+import numpy as np
 
 
 class Pod:
@@ -56,6 +57,7 @@ class Pod:
         self.current_target_id = 0
         self.next_target_id = 0
         self.current_target = [0, 0]
+        self.next_target = [0, 0]
         self.number_laps = 0
 
         # Angle
@@ -73,6 +75,13 @@ class Pod:
         self.y_out = 0
         self.num_turns = 0
         self.personality = attitude
+        self.v_mag = 0;
+
+        # For pre-emptive turning
+        self.turning_theta = 0
+        self.turns_next_target = 0
+        self.turns_hit_target = 0
+        self.rotation_limit = math.radians(18);
 
         # Prev Values
         self.x_prev = 0
@@ -110,6 +119,7 @@ class Pod:
         self.power_prev = "0"
         self.x_out_prev = 0
         self.y_out_prev = 0
+        self.v_mag_prev = 0;
 
     def calc_vector_mag(self, vect_x, vect_y):
         return math.sqrt(vect_x ** 2 + vect_y ** 2)
@@ -138,6 +148,7 @@ class Pod:
 
         # First figure out what's happening with the pod
         # Calc what wasn't given
+        self.update_velocity()
         self.update_accelerations()
         self.update_Fp()
 
@@ -216,6 +227,7 @@ class Pod:
         self.power_prev = self.power
         self.thrust_d_prev = self.thrust_d
         self.thrust_v_prev = self.theta_v
+        self.v_mag_prev = self.v_mag
 
     def new_inputs(self, input_list):
         x_ind = 0
@@ -254,6 +266,9 @@ class Pod:
     def update_target_positions(self):
         self.current_target[0] = self.targets_x[self.current_target_id]
         self.current_target[1] = self.targets_y[self.current_target_id]
+
+        self.next_target[0] = self.targets_x[self.next_target_id]
+        self.next_target[1] = self.targets_y[self.next_target_id]
 
     def update_target_locations(self):
         x_diff = self.current_target[0] - self.x
@@ -316,13 +331,38 @@ class Pod:
 
         # Preemptive Turning for next checkpoint
         # Check to see if pod is close and on target
-        print("NEXT: " + str(self.distance) + ", " + str(self.check_on_target()) + ", " + str(
-            self.calc_vector_mag(self.vx, self.vy)), file=sys.stderr)
-        if self.distance < 2000 and self.check_on_target() and self.calc_vector_mag(self.vx, self.vy) > 100:
-            self.x_out = int(self.targets_x[self.next_target_id])
-            self.y_out = int(self.targets_y[self.next_target_id])
-            self.thrust_d = 0
-            print("YAY!", file=sys.stderr)
+        # print_text = str(self.distance)
+        # print_text = print_text + ", " + str(self.check_on_target())
+        # print_text = print_text + ", " + str(self.v_mag)
+        # print_text = print_text + ", " + str(self.turning_theta)
+        # print("NEXT: " + print_text, file=sys.stderr)
+        
+        if self.check_on_target():
+            self.calc_next_target_theta()
+            self.turns_next_target = self.turning_theta/self.rotation_limit;
+            if self.v_mag != 0: # Check for div by 0
+                self.turns_hit_target = self.distance/self.v_mag
+            else:
+                self.turns_hit_target = 500
+
+            if (self.turns_hit_target - self.turns_next_target) < 0:
+                self.x_out = int(self.targets_x[self.next_target_id])
+                self.y_out = int(self.targets_y[self.next_target_id])
+                self.thrust_d = 0
+                print("YAY!", file=sys.stderr)
+
+        # if self.distance < 2000 and self.check_on_target() and self.calc_vector_mag(self.vx, self.vy) > 100:
+        #     self.x_out = int(self.targets_x[self.next_target_id])
+        #     self.y_out = int(self.targets_y[self.next_target_id])
+        #     self.thrust_d = 0
+        #     print("YAY!", file=sys.stderr)
+
+        # Check to see if pod is close and on target
+        print_text = str(self.distance)
+        print_text = print_text + ", " + str(self.check_on_target())
+        print_text = print_text + ", " + str(self.v_mag)
+        print_text = print_text + ", " + str(math.degrees(self.turning_theta - self.rotation_limit))
+        print("NEXT: " + print_text, file=sys.stderr)
 
         if self.thrust_d > 100:
             self.thrust_d = 100
@@ -339,6 +379,9 @@ class Pod:
             self.thrust = 100
 
         self.power = " " + str(int(self.thrust))
+
+    def update_velocity(self):
+        self.v_mag = self.calc_vector_mag(self.vx, self.vy)
 
     def update_accelerations(self):
         self.ax = self.vx - self.vx_prev
@@ -365,7 +408,36 @@ class Pod:
 
         # print("ON TARG: " + str(self.theta_v) + ", " + str(self.theta_d_next) + ", " + str(theta_diff), file=sys.stderr);
 
-        return theta_diff < 18
+        # Get the displacements from the next target
+        x_diff = self.current_target[0] - self.x
+        y_diff = self.current_target[1] - self.y
+
+        # Set up vectors for math
+        a = [self.vx, self.vy]
+        b = [x_diff, y_diff]
+
+        # Angle between (pod, current target, next target)
+        self.turning_theta = math.acos(np.inner(a,b)/(self.distance*self.v_mag))
+
+        return self.turning_theta < self.rotation_limit
+
+    def calc_next_target_theta(self):
+        # Get the displacements from the next target
+        x_diff_p = self.current_target[0] - self.x
+        y_diff_p = self.current_target[1] - self.y
+
+        x_diff_np = self.current_target[0] - self.next_target[0]
+        y_diff_np = self.current_target[1] - self.next_target[1]
+
+        # Get the distance between the two targets
+        mag_np = self.calc_vector_mag(x_diff_np, y_diff_np)
+
+        # Set up vectors for math
+        a = [x_diff_p, y_diff_p]
+        b = [x_diff_np, y_diff_np]
+
+        # Angle between (pod, current target, next target)
+        self.turning_theta = math.acos(np.inner(a,b)/(self.distance*mag_np))
 
     def say_something(self):
         return "Listen!"
