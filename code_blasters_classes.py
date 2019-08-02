@@ -76,6 +76,8 @@ class Pod:
         self.num_turns = 0
         self.personality = attitude
         self.v_mag = 0;
+        self.boost_used = False
+        self.turns_for_boost = 0
 
         # For pre-emptive turning
         self.turning_theta = 0
@@ -244,7 +246,7 @@ class Pod:
         self.vy = input_list[vy_ind]
         self.angle = input_list[ang_ind]
         self.current_target_id = input_list[id_ind]
-        self.next_target_id = (self.current_target_id + 1) % self.number_laps
+        self.next_target_id = (self.current_target_id + 1) % int(len(self.targets_x))
 
     def new_inputs_defender(self, input_list):
         x_ind = 0
@@ -346,10 +348,15 @@ class Pod:
             else:
                 self.turns_hit_target = 500
 
-            if (self.turns_hit_target - self.turns_next_target) < 0:
-                self.x_out = int(self.targets_x[self.next_target_id])
-                self.y_out = int(self.targets_y[self.next_target_id])
-                self.thrust_d = 0
+            if (self.turns_hit_target - self.turns_next_target) < 2:
+                self.x_out = int(self.current_target[0])
+                self.y_out = int(self.current_target[1])
+                # if self.boost_used == False:
+                #     self.boost_used = True
+                # else:
+                #     if self.turns_for_boost > 0:
+                #         self
+                self.thrust_d = self.thrust_d * 0.25
                 print("YAY!", file=sys.stderr)
 
         # if self.distance < 2000 and self.check_on_target() and self.calc_vector_mag(self.vx, self.vy) > 100:
@@ -359,11 +366,11 @@ class Pod:
         #     print("YAY!", file=sys.stderr)
 
         # Check to see if pod is close and on target
-        print_text = str(self.distance)
-        print_text = print_text + ", " + str(self.check_on_target())
-        print_text = print_text + ", " + str(self.v_mag)
-        print_text = print_text + ", " + str(math.degrees(self.turning_theta - self.rotation_limit))
-        print("NEXT: " + print_text, file=sys.stderr)
+        # print_text = str(self.distance)
+        # print_text = print_text + ", " + str(self.check_on_target())
+        # print_text = print_text + ", " + str(self.v_mag)
+        # print_text = print_text + ", " + str(math.degrees(self.turning_theta - self.rotation_limit))
+        # print("NEXT: " + print_text, file=sys.stderr)
 
         if self.thrust_d > 100:
             self.thrust_d = 100
@@ -375,14 +382,14 @@ class Pod:
 
             # If we are far away
             if self.distance > 2000:
-                # Are we aren't facing in the right direction
+                # And we aren't facing in the right direction
                 if self.facing_theta > self.rotation_limit:
                     # Slow down
                     self.thrust_d = self.thrust_d * 0.50;
             else:
                 if self.thrust_d > 5:
                     self.thrust_d = 5;
-            print("w00+!", file=sys.stderr)
+            # print("w00+!", file=sys.stderr)
 
         self.calc_facing_theta()
         self.which_way_turn()
@@ -476,25 +483,26 @@ class Pod:
 
     def which_way_turn(self):
         # Get the displacements from the next target
-        x_diff_pod = self.current_target[0] - self.x
-        y_diff_pod = self.current_target[1] - self.y
+        x_diff_pod = self.x - self.current_target[0]
+        y_diff_pod = self.y - self.current_target[1]
 
         x_diff_targets = self.next_target[0] - self.current_target[0]
         y_diff_targets = self.next_target[1] - self.current_target[1]
 
         theta_np = self.calc_vector_theta(x_diff_targets, y_diff_targets)
+        dist_np = self.calc_vector_mag(x_diff_targets, y_diff_targets)
 
         a = [x_diff_pod, y_diff_pod]
         b = [x_diff_targets, y_diff_targets]
 
         turning_angle = theta_np - self.facing_theta
 
-        turning_sign = np.cross(a,b)
+        turning_sign = math.degrees(math.asin(np.linalg.norm(np.cross(a,b))/(self.distance * dist_np)))
 
         if turning_sign > 0:
-            print("Left " + str(math.degrees(theta_np)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
+            print("Left " + str(math.degrees(turning_sign)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
         else:
-            print("Right " + str(math.degrees(theta_np)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
+            print("Right " + str(math.degrees(turning_sign)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
 
 
     def say_something(self):
