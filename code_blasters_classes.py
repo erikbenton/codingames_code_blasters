@@ -17,6 +17,7 @@ class Pod:
         self.x_d = 0
         self.vx_d = 0
         self.ax_d = 0
+        self.desired_x = 0
 
         # Commanded
         self.x_cmd = 0
@@ -33,6 +34,7 @@ class Pod:
         self.y_d = 0
         self.vy_d = 0
         self.ay_d = 0
+        self.desired_y = 0
 
         # Commanded
         self.y_cmd = 0
@@ -327,9 +329,11 @@ class Pod:
         # else:
         #     self.x_out = self.current_target[0];
         #     self.y_out = self.current_target[1];
-
-        self.x_out = self.x + self.current_target[0] - self.x - self.vx
-        self.y_out = self.y + self.current_target[1] - self.y - self.vy
+        self.calc_next_x_y(self.current_target[0], self.current_target[1])
+        self.x_out = self.x + self.desired_x - self.x - self.vx
+        self.y_out = self.y + self.desired_y - self.y - self.vy
+        # self.x_out = self.x + self.current_target[0] - self.x - self.vx
+        # self.y_out = self.y + self.current_target[1] - self.y - self.vy
         self.thrust = self.calc_vector_mag(self.ax_d, self.ay_d)
 
         # Preemptive Turning for next checkpoint
@@ -348,9 +352,12 @@ class Pod:
             else:
                 self.turns_hit_target = 500
 
-            if (self.turns_hit_target - self.turns_next_target) < 2:
-                self.x_out = int(self.current_target[0])
-                self.y_out = int(self.current_target[1])
+            if (self.turns_hit_target - self.turns_next_target) < 3:
+                self.calc_next_x_y(self.next_target[0], self.next_target[1])
+                self.x_out = self.desired_x
+                self.y_out = self.desired_y
+                # self.x_out = int(self.next_target[0])
+                # self.y_out = int(self.next_target[1])
                 # if self.boost_used == False:
                 #     self.boost_used = True
                 # else:
@@ -385,10 +392,10 @@ class Pod:
                 # And we aren't facing in the right direction
                 if self.facing_theta > self.rotation_limit:
                     # Slow down
-                    self.thrust_d = self.thrust_d * 0.50;
+                    self.thrust_d = self.thrust_d #* 0.50;
             else:
                 if self.thrust_d > 5:
-                    self.thrust_d = 5;
+                    self.thrust_d = self.thrust_d
             # print("w00+!", file=sys.stderr)
 
         self.calc_facing_theta()
@@ -503,6 +510,27 @@ class Pod:
             print("Left " + str(math.degrees(turning_sign)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
         else:
             print("Right " + str(math.degrees(turning_sign)) + " - " + str(math.degrees(self.facing_theta)) + " = " + str(math.degrees(turning_angle)), file=sys.stderr)
+
+    def calc_next_x_y(self, origin_x, origin_y):
+        # Set up vectors with the current target as the origin
+        target_pod_x = self.x - origin_x #self.current_target[0]
+        target_pod_y = self.y - origin_y # self.current_target[1]
+        target_pod_vect = np.array([target_pod_x, target_pod_y])
+        target_pod_vect_mag = self.calc_vector_mag(target_pod_x, target_pod_y)
+
+        target_next_x = self.next_target[0] - origin_x #self.current_target[0]
+        target_next_y = self.next_target[1] - origin_y # self.current_target[1]
+        target_next_vect = np.array([target_next_x, target_next_y])
+        target_next_vect_mag = self.calc_vector_mag(target_next_x, target_next_y)
+
+        # Get the bisecting vector
+        unscaled_desired_vect_x = target_pod_vect_mag * target_next_vect[0] + target_next_vect_mag * target_pod_vect[0]
+        unscaled_desired_vect_y = target_pod_vect_mag * target_next_vect[1] + target_next_vect_mag * target_pod_vect[1]
+
+        unscaled_desired_vect_theta = self.calc_vector_theta(unscaled_desired_vect_x, unscaled_desired_vect_y)
+
+        self.desired_x = 500 * math.cos(unscaled_desired_vect_theta) + origin_x #self.current_target[0]
+        self.desired_y = 500 * math.sin(unscaled_desired_vect_theta) + origin_y # self.current_target[1]
 
 
     def say_something(self):
