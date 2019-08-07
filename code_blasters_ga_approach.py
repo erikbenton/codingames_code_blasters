@@ -263,12 +263,14 @@ class Solution:
     def __init__(self):
         self.moves1 = []
         self.moves2 = []
+        self.score: float = 0.0
 
     def randomize(self):
         return
 
     def score(self, pod_in, checkpoints):
-        pod_in.score(checkpoints)
+        self.score = pod_in.score(checkpoints)
+        return
 
 class Move:
     def __init__(self, point_in, angle_in, thrust_in):
@@ -381,28 +383,40 @@ while True:
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr)
-
-    # Create 5 initial "6 step" solutions
+    # Create five solutions for each pod
     solutions = []
-    for l in range(len(pod_clones)):
-        solutions.append(Solution())
-    # For six turns
-    for l in range(5):
-        moves = []
-        for n in range(len(pod_clones)):
-            # First, create one turn for every pod
-            if pod_clones[n].next_target_id + 1 == pod_clones[n].num_targets:
-                next_target = 0
-            else:
-                next_target = pod_clones[n].next_target_id + 1
-            current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], l)
-            moves.append(current_move)
-            # Save that move for each pod
-            solutions[n].moves1.append(current_move)
-            auto_trajectory(pod_clones, moves)
-    # Score them
-    for l in range(len(solutions)):
-
+    num_solutions: int = 5
+    for i in range(num_solutions):
+        solution = Solution()
+        # For six turns
+        num_turns = 6
+        for l in range(num_turns):
+            # Create list for saving the moves
+            moves = []
+            # For each pod
+            for n in range(len(pod_clones)):
+                # Get the pod's next target (without %) for 'autopilot'
+                if pod_clones[n].next_target_id + 1 == pod_clones[n].num_targets:
+                    next_target = 0
+                else:
+                    next_target = pod_clones[n].next_target_id + 1
+                # Create one turn
+                current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], l)
+                # Save the move for that pod for this turn
+                moves.append(current_move)
+                # Save that move for that specific pod
+                if n == 0:  # First pod
+                    solution.moves1.append(current_move)
+                elif n == 1:  # Second pod
+                    solution.moves2.append(current_move)
+                # Play all the moves for all the clones
+                auto_trajectory(pod_clones, moves)
+        # Add the solution to the list of solutions
+        solutions.append(solution)
+        scores = []
+        # Score the solutions
+        for l in range(len(solutions)):
+            scores.append(solutions[l].score(pod_clones[l], targets)
     # Pick the best 3
     # Loop through 10 times
         # Mutate them -> 5
