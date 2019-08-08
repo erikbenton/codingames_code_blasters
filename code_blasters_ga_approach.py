@@ -82,8 +82,9 @@ class Pod(Unit):
         self.timeout: int = 100
         self.partner = None
         self.shield: bool = False
-        self.number_laps = laps_in
+        self.number_laps: int = laps_in
         self.solutions = []
+        self.fitness: float = 0
         return
 
     def add_partner(self, pod):
@@ -134,24 +135,27 @@ class Pod(Unit):
         self.y += self.vy * t
         return
 
-    def end(self):
+    def end(self, checkpoints):
         self.x = round(self.x)
         self.y = round(self.y)
         self.vx = math.trunc(self.vx * 0.85)
         self.vy = math.trunc(self.vy * 0.85)
         self.timeout -= 1
-        return
+        self.fitness = self.score(checkpoints)
+        return self.fitness
 
-    def play(self, point, thrust):
+    def play(self, point, thrust, checkpoints):
+        self.fitness = 0
+        self.checked = 0
         self.rotate(point)
         self.boost(thrust)
         self.move(1.0)
-        self.end()
+        self.end(checkpoints)
         return
 
     def bounce(self, unit):
         if isinstance(unit, Checkpoint):
-            self.bounce_with_checkpoint(Checkpoint(unit.x, unit.y, unit.next_target_id, unit.radius, unit.num_targets))
+            self.bounce_with_checkpoint()
         else:
             mass1: float = 10 if self.shield else 1
             mass2: float = 10 if unit.shield else 1
@@ -178,7 +182,7 @@ class Pod(Unit):
             unit.fy += fy / mass2
         return
 
-    def bounce_with_checkpoint(self, checkpoint):
+    def bounce_with_checkpoint(self):
         self.next_target_id += 1
         if self.next_target_id == self.num_targets:
             self.next_target_id = 0
@@ -187,7 +191,8 @@ class Pod(Unit):
         return
 
     def score(self, checkpoints):
-        return self.checked * 50000 - self.distance(checkpoints[self.next_target_id])
+        self.fitness = self.checked * 50000 - self.distance(checkpoints[self.next_target_id])
+        return self.fitness
 
     def output(self, move):
         theta: float = self.angle + move.angle
@@ -248,12 +253,12 @@ class Pod(Unit):
             thrust = base
         return thrust
 
-    def autopilot(self, target, next_target, style):
+    def autopilot(self, target, next_target, style, checkpoints):
         target_point = self.autopilot_point(target, next_target)
         theta = self.get_angle(target_point)
         thrust = self.autopilot_thrust(target_point, style)
         # Play the turn
-        self.play(target_point, thrust)
+        self.play(target_point, thrust, checkpoints)
         return Move(target_point, theta, thrust)
 
 
@@ -268,15 +273,30 @@ class Checkpoint(Unit):
 class Solution:
     def __init__(self):
         self.moves1 = []
+        self.score1: float = 0.0
         self.moves2 = []
-        self.score: float = 0.0
+        self.score2: float = 0.0
+        self.overall_fitness: float = 0.0
 
     def randomize(self):
         return
 
-    def rate(self, pod_in, checkpoints):
-        self.score = pod_in.score(checkpoints)
+    def score(self):
+        for j in range(len(self.moves1)):
+            self.scores1 += moves1[j].fitness
+        for j in range(len(self.moves2)):
+            self.scores2 += moves2[j].fitness
+        self.overall_fitness = (self.score1 + self.score2) / 2
         return
+
+    def mutate(self, amplitude):
+        mutated_moves1 = []
+        mutated_moves2 = []
+        for j in range(len(self.moves1)):
+            mutated_moves1.append(moves1[j].mutate(amplitude))
+        for j in range(len(self.moves2)):
+            mutated_moves2 += moves2[j].mutate(amplitude)
+        return [mutated_moves1, mutated_moves2]
 
 
 class Move:
@@ -284,6 +304,7 @@ class Move:
         self.point: Point = point_in
         self.angle: float = angle_in
         self.thrust: int = thrust_in
+        self.fitness: float = 0.0
 
     def mutate(self, amplitude):
         ramin: float = self.angle - 36.0 * amplitude
@@ -315,10 +336,11 @@ def auto_trajectory(pod_list, checkpoints, move_list):
         pod_list[j].rotate(move_list[j].point)
         pod_list[j].boost(move_list[j].thrust)
 
-    play_turn(pod_list, checkpoints)
+    return play_turn(pod_list, checkpoints)
 
 
 def play_turn(pod_list, checkpoints):
+    fitness_results = []
     t: float = 0.0
     while t < 1.0:
         first_collision = None
@@ -342,8 +364,8 @@ def play_turn(pod_list, checkpoints):
             first_collision.unit_a.bounce(first_collision.unit_b)
             t += first_collision.t
     for j in range(len(pod_list)):
-        pod_list[i].end()
-    return
+        fitness_results.append(pod_list[i].end(checkpoints));
+    return fitness_results
 
 
 first_turn: bool = True
@@ -410,7 +432,8 @@ while True:
                 else:
                     next_target = pod_clones[n].next_target_id + 1
                 # Create one turn
-                current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], l)
+                current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], l,
+                                                       targets)
                 # Save the move for that pod for this turn
                 moves.append(current_move)
                 # Save that move for that specific pod
@@ -418,15 +441,24 @@ while True:
                     solution.moves1.append(current_move)
                 elif n == 1:  # Second pod
                     solution.moves2.append(current_move)
-                # Play all the moves for all the clones
-                auto_trajectory(pod_clones, targets, moves)
+            # Play all the moves for all the clones and get their 'fitness'
+            fitness = auto_trajectory(pod_clones, targets, moves)
+            # Save that move's fitness
+            solution.moves1[l].fitness = fitness[0]
+            solution.moves2[l].fitness = fitness[1]
         # Add the solution to the list of solutions
         solutions.append(solution)
         scores = []
         # Score the solutions
         for l in range(len(solutions)):
-            scores.append(solutions[l].rate(pod_clones[l], targets))
+            scores.append(solutions[l].score())
+    # Sort the solutions to pick best three (avg of score1 + score2)
+    solutions.sort(key = lambda parent: parent.overall_score, reverse = True)
     # Pick the best 3
+    parents = []
+    num_parents: int = 3
+    for j in range(num_parents):
+        parents.append(solutions[j])
     # Loop through 10 times
     # Mutate them -> 5
     # Run mutations
