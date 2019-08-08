@@ -2,6 +2,7 @@ import sys
 import math
 import numpy as np
 
+
 class Point:
     def __init__(self, x_in, y_in):
         self.x: float = x_in
@@ -11,14 +12,14 @@ class Point:
         return math.sqrt(self.distance_squared(point))
 
     def distance_squared(self, point):
-        return (self.x - point.x)**2 + (self.y - point.y)**2
+        return (self.x - point.x) ** 2 + (self.y - point.y) ** 2
 
     def closest(self, point1, point2):
         da: float = point2.y - point1.y
         db: float = point2.x - point1.x
         c1: float = da * point1.x + db * point1.y
         c2: float = -db * self.x + da * self.y
-        det: float = da**2 + db**2
+        det: float = da ** 2 + db ** 2
         if det != 0:
             cx: float = (da * c1 - db * c2) / det
             cy: float = (da * c2 + db * c1) / det
@@ -26,6 +27,7 @@ class Point:
             cx: float = self.x
             cy: float = self.y
         return Point(cx, cy)
+
 
 class Unit(Point):
     def __init__(self, x_in, y_in, vx_in, vy_in, id_in, radius_in, num_targets_in):
@@ -38,10 +40,10 @@ class Unit(Point):
 
     def collision(self, unit):
         distance: float = self.distance_squared(unit)
-        radius_sum: float = (self.radius + unit.radius)**2
-        if distance < radius_sum: # Objects already touching
+        radius_sum: float = (self.radius + unit.radius) ** 2
+        if distance < radius_sum:  # Objects already touching
             return Collision(self, unit, 0.0)
-        if self.vx == unit.vx and self.vy == unit.vy: # Parallel objects
+        if self.vx == unit.vx and self.vy == unit.vy:  # Parallel objects
             return None
         collision_x: float = self.x - unit.x
         collision_y: float = self.y - unit.y
@@ -49,11 +51,12 @@ class Unit(Point):
         collision_vx: float = self.vx - unit.vx
         collision_vy: float = self.vy - unit.vy
         unit_point: Point = Point(0, 0)
-        closest_point: Point = unit_point.closest(collision_point, Point(collision_x + collision_vx, collision_y + collision_vy))
+        closest_point: Point = unit_point.closest(collision_point,
+                                                  Point(collision_x + collision_vx, collision_y + collision_vy))
         closest_point_distance: float = unit_point.distance_squared(closest_point)
         collision_point_distance: float = collision_point.distance_squared(closest_point)
         if closest_point_distance < radius_sum:
-            length: float = math.sqrt(collision_vx**2 + collision_vy**2)
+            length: float = math.sqrt(collision_vx ** 2 + collision_vy ** 2)
             backup_distance: float = math.sqrt(radius_sum - closest_point_distance)
             closest_point.x = closest_point.x - backup_distance * (collision_vx / length)
             closest_point.y = closest_point.y - backup_distance * (collision_vy / length)
@@ -68,6 +71,7 @@ class Unit(Point):
 
     def bounce(self, unit):
         return
+
 
 class Pod(Unit):
     def __init__(self, x_in, y_in, vx_in, vy_in, angle_in, id_in, radius_in, num_targets_in, laps_in):
@@ -233,7 +237,7 @@ class Pod(Unit):
             if style == 0:
                 thrust = (100 * (distance / (far_away - approach_dist)) - base) + base
             elif style == 1:
-                thrust = scale_factor * math.atan(stretch_factor*(distance - approach_dist)) + base
+                thrust = scale_factor * math.atan(stretch_factor * (distance - approach_dist)) + base
             elif style == 2:
                 thrust = 75
             elif style == 3:
@@ -252,12 +256,14 @@ class Pod(Unit):
         self.play(target_point, thrust)
         return Move(target_point, theta, thrust)
 
+
 class Checkpoint(Unit):
     def __init__(self, x_in, y_in, id_in, radius_in, num_targets_in):
         super(Checkpoint, self).__init__(x_in, y_in, 0.0, 0.0, id_in, radius_in, num_targets_in)
 
     def bounce(self, unit):
         return
+
 
 class Solution:
     def __init__(self):
@@ -268,9 +274,10 @@ class Solution:
     def randomize(self):
         return
 
-    def score(self, pod_in, checkpoints):
+    def rate(self, pod_in, checkpoints):
         self.score = pod_in.score(checkpoints)
         return
+
 
 class Move:
     def __init__(self, point_in, angle_in, thrust_in):
@@ -288,18 +295,20 @@ class Move:
         self.angle = (ramax - ramin) * np.random.random() + ramin
         pmin: int = self.thrust - 200 * amplitude
         pmax: int = self.thrust + 200 * amplitude
-        if pmin  < 0:
+        if pmin < 0:
             pmin = 0
         if pmax > 0:
             pmax = 200
         self.thrust = (pmax - pmin) * np.random.random() + pmin
         return
 
+
 class Collision:
     def __init__(self, unit1, unit2, t_factor):
         self.unit_a: Unit = unit1
         self.unit_b: Unit = unit2
         self.time: float = t_factor
+
 
 def auto_trajectory(pod_list, checkpoints, move_list):
     for j in range(len(pod_list)):
@@ -308,12 +317,13 @@ def auto_trajectory(pod_list, checkpoints, move_list):
 
     play_turn(pod_list, checkpoints)
 
+
 def play_turn(pod_list, checkpoints):
     t: float = 0.0
     while t < 1.0:
         first_collision = None
         for j in range(len(pod_list)):
-            for k in range(j+1, len(pod_list)):
+            for k in range(j + 1, len(pod_list)):
                 collision = pod_list[j].collision(pod_list[j])
                 if (collision is not None) and (collision.t + t < 1.0) and (
                         (first_collision is None) or (collision.t < first_collision.t)):
@@ -335,6 +345,7 @@ def play_turn(pod_list, checkpoints):
         pod_list[i].end()
     return
 
+
 first_turn: bool = True
 targets = []
 
@@ -342,7 +353,6 @@ targets = []
 # the standard input according to the problem statement.
 
 laps: int = int(input())
-
 
 checkpoint_count: int = int(input())
 
@@ -368,7 +378,6 @@ while True:
         x, y, vx, vy, angle, next_check_point_id = [int(j) for j in input().split()]
         pods.append(Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps))
         pod_clones.append(Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps))
-
 
     for i in range(2):
         # x_2: x position of the opponent's pod
@@ -410,19 +419,19 @@ while True:
                 elif n == 1:  # Second pod
                     solution.moves2.append(current_move)
                 # Play all the moves for all the clones
-                auto_trajectory(pod_clones, moves)
+                auto_trajectory(pod_clones, targets, moves)
         # Add the solution to the list of solutions
         solutions.append(solution)
         scores = []
         # Score the solutions
         for l in range(len(solutions)):
-            scores.append(solutions[l].score(pod_clones[l], targets)
+            scores.append(solutions[l].rate(pod_clones[l], targets))
     # Pick the best 3
     # Loop through 10 times
-        # Mutate them -> 5
-        # Run mutations
-        # Score them
-        # Pick best 3
+    # Mutate them -> 5
+    # Run mutations
+    # Score them
+    # Pick best 3
 
     # Play the best move
 
