@@ -415,12 +415,14 @@ while True:
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr)
     # Create five solutions for each pod
+    num_generations: int = 10
     solutions = []
+    num_turns = 6
     num_solutions: int = 5
+    num_parents: int = 3
     for i in range(num_solutions):
         solution = Solution()
         # For six turns
-        num_turns = 6
         for l in range(num_turns):
             # Create list for saving the moves
             moves = []
@@ -448,22 +450,34 @@ while True:
             solution.moves2[l].fitness = fitness[1]
         # Add the solution to the list of solutions
         solutions.append(solution)
-        scores = []
-        # Score the solutions
-        for l in range(len(solutions)):
-            scores.append(solutions[l].score())
-    # Sort the solutions to pick best three (avg of score1 + score2)
-    solutions.sort(key = lambda parent: parent.overall_score, reverse = True)
-    # Pick the best 3
-    parents = []
-    num_parents: int = 3
-    for j in range(num_parents):
-        parents.append(solutions[j])
-    # Loop through 10 times
-    # Mutate them -> 5
-    # Run mutations
-    # Score them
-    # Pick best 3
+    for i in range(num_generations):
+        # Sort the solutions to pick best three (avg of score1 + score2)
+        solutions.sort(key = lambda parent: parent.overall_score, reverse = True)
+        # Pick the best 3
+        parents = []
+        children = []
+        for j in range(num_parents):
+            # Add one of top 3 to parents
+            parents.append(solutions[j])
+        # For every parent, mutate the first move then play the rest of the turns
+        
+            # Mutate the parent's moves
+            mutated_moves = solutions[j].mutate(0.5)
+            # Create a child
+            child = Solution()
+            # Add the mutated moves to the child
+            child.moves1 = mutated_moves[0]
+            child.moves2 = mutated_moves[1]
+            # Score the child
+            child.score()
+            # Add the child to the children
+            children.append(child)
+        solutions = parents + children
+        # Loop through 10 times
+        # Mutate them -> 5
+        # Run mutations
+        # Score them
+        # Pick best 3
 
     # Play the best move
 
