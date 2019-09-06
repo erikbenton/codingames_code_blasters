@@ -321,7 +321,7 @@ class Move:
         if pmax > 0:
             pmax = 200
         self.thrust = (pmax - pmin) * np.random.random() + pmin
-        return
+        return self
 
 
 class Collision:
