@@ -400,7 +400,6 @@ while True:
         x, y, vx, vy, angle, next_check_point_id = [int(j) for j in input().split()]
         pod = Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps)
         pods.append(pod)
-        pod_clones.append(pod)
 
     for i in range(2):
         # x_2: x position of the opponent's pod
@@ -412,7 +411,7 @@ while True:
         x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2 = [int(j) for j in input().split()]
         pod = Pod(x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2, 400, checkpoint_count, laps)
         pods.append(pod)
-        pod_clones.append(pod)
+    pod_clones = pods
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr)
