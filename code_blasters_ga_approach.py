@@ -179,7 +179,7 @@ class Pod(Unit):
             self.vx -= fx / mass1
             self.vy -= fy / mass1
             unit.vx += fx / mass2
-            unit.fy += fy / mass2
+            unit.vy += fy / mass2
         return
 
     def bounce_with_checkpoint(self):
@@ -283,9 +283,9 @@ class Solution:
 
     def score(self):
         for j in range(len(self.moves1)):
-            self.scores1 += moves1[j].fitness
+            self.score1 += self.moves1[j].fitness
         for j in range(len(self.moves2)):
-            self.scores2 += moves2[j].fitness
+            self.score2 += self.moves2[j].fitness
         self.overall_fitness = (self.score1 + self.score2) / 2
         return
 
@@ -293,9 +293,9 @@ class Solution:
         mutated_moves1 = []
         mutated_moves2 = []
         for j in range(len(self.moves1)):
-            mutated_moves1.append(moves1[j].mutate(amplitude))
+            mutated_moves1.append(self.moves1[j].mutate(amplitude))
         for j in range(len(self.moves2)):
-            mutated_moves2 += moves2[j].mutate(amplitude)
+            mutated_moves2.append(self.moves2[j].mutate(amplitude))
         return [mutated_moves1, mutated_moves2]
 
 
@@ -346,13 +346,13 @@ def play_turn(pod_list, checkpoints):
         first_collision = None
         for j in range(len(pod_list)):
             for k in range(j + 1, len(pod_list)):
-                collision = pod_list[j].collision(pod_list[j])
-                if (collision is not None) and (collision.t + t < 1.0) and (
-                        (first_collision is None) or (collision.t < first_collision.t)):
+                collision = pod_list[j].collision(pod_list[k])
+                if (collision is not None) and (collision.time + t < 1.0) and (
+                        (first_collision is None) or (collision.time < first_collision.time)):
                     first_collision = collision
             collision = pod_list[j].collision(checkpoints[pod_list[j].next_target_id])
-            if (collision is not None) and (collision.t + t < 1.0) and (
-                    (first_collision is None) or (collision.t < first_collision.t)):
+            if (collision is not None) and (collision.time + t < 1.0) and (
+                    (first_collision is None) or (collision.time < first_collision.time)):
                 first_collision = collision
         if first_collision is None:
             for j in range(len(pod_list)):
@@ -360,11 +360,11 @@ def play_turn(pod_list, checkpoints):
             t = 1.0
         else:
             for j in range(len(pod_list)):
-                pod_list[j].move(first_collision.t)
+                pod_list[j].move(first_collision.time)
             first_collision.unit_a.bounce(first_collision.unit_b)
-            t += first_collision.t
+            t += first_collision.time
     for j in range(len(pod_list)):
-        fitness_results.append(pod_list[i].end(checkpoints));
+        fitness_results.append(pod_list[j].end(checkpoints))
     return fitness_results
 
 
@@ -398,8 +398,9 @@ while True:
         # angle: angle of your pod
         # next_check_point_id: next check point id of your pod
         x, y, vx, vy, angle, next_check_point_id = [int(j) for j in input().split()]
-        pods.append(Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps))
-        pod_clones.append(Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps))
+        pod = Pod(x, y, vx, vy, angle, next_check_point_id, 400, checkpoint_count, laps)
+        pods.append(pod)
+        pod_clones.append(pod)
 
     for i in range(2):
         # x_2: x position of the opponent's pod
@@ -409,17 +410,20 @@ while True:
         # angle_2: angle of the opponent's pod
         # next_check_point_id_2: next check point id of the opponent's pod
         x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2 = [int(j) for j in input().split()]
-        pods.append(Pod(x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2, 400, checkpoint_count, laps))
-        pod_clones.append(Pod(x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2, 400, checkpoint_count, laps))
+        pod = Pod(x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2, 400, checkpoint_count, laps)
+        pods.append(pod)
+        pod_clones.append(pod)
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr)
+
     # Create five solutions for each pod
-    num_generations: int = 10
+    num_generations: int = 3
     solutions = []
-    num_turns = 6
+    num_turns = 4
     num_solutions: int = 5
     num_parents: int = 3
+    print("Here")
     for i in range(num_solutions):
         solution = Solution()
         # For six turns
@@ -452,7 +456,7 @@ while True:
         solutions.append(solution)
     for i in range(num_generations):
         # Sort the solutions to pick best three (avg of score1 + score2)
-        solutions.sort(key = lambda parent: parent.overall_score, reverse = True)
+        solutions.sort(key=lambda parent: parent.overall_score, reverse=True)
         # Pick the best 3
         parents = []
         children = []
