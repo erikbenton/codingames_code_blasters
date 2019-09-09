@@ -227,8 +227,8 @@ class Pod(Unit):
         unscaled_desired_vect_x = target_pod_vect_mag * target_next_vect[0] + target_next_vect_mag * target_pod_vect[0]
         unscaled_desired_vect_y = target_pod_vect_mag * target_next_vect[1] + target_next_vect_mag * target_pod_vect[1]
         unscaled_desired_vect_theta = math.atan2(unscaled_desired_vect_y, unscaled_desired_vect_x)
-        desired_x = 450 * math.cos(unscaled_desired_vect_theta) + target.x
-        desired_y = 450 * math.sin(unscaled_desired_vect_theta) + target.y
+        desired_x = 300 * math.cos(unscaled_desired_vect_theta) + target.x
+        desired_y = 300 * math.sin(unscaled_desired_vect_theta) + target.y
         # Create point from desired x & y
         target_point = Point(desired_x, desired_y)
         return target_point
@@ -345,53 +345,37 @@ def auto_trajectory(pod_list, checkpoints, move_list):
 
 
 def play_turn(pod_list, checkpoints):
-    print("Start turn", file=sys.stderr)
     bug_found = False
-    bug_collision = None
     fitness_results = []
     t: float = 0.0
     while t < 1.0:
         first_collision = None
-        print(str(bug_collision), file=sys.stderr)
         for j in range(len(pod_list)):
             for k in range(j + 1, len(pod_list)):
-                # print("B40 Col", file=sys.stderr)
                 collision = pod_list[j].collision(pod_list[k])
                 if (collision is not None) and (collision.time + t < 1.0) and (
                         (first_collision is None) or (collision.time < first_collision.time)):
-                    # if bug_collision is not None:
-                    #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
-                    #             and collision.time > 0:
                     first_collision = collision
                     if bug_found:
-                        print(str(bug_collision.unit_a) + " " + str(first_collision.unit_a) + " " + str(bug_collision.unit_b) + " " + str(first_collision.unit_b) + " " + str(first_collision.time), file=sys.stderr)
                         if first_collision.time <= 0:
                             first_collision = None
-            # print("B41 Col", file=sys.stderr)
             collision = pod_list[j].collision(checkpoints[pod_list[j].next_target_id])
             if (collision is not None) and (collision.time + t < 1.0) and (
                     (first_collision is None) or (collision.time < first_collision.time)):
-                    # if bug_collision is not None:
-                    #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
-                    #             and collision.time > 0:
                 first_collision = collision
                 if bug_found:
                     if first_collision.time <= 0:
                         first_collision = None
         if first_collision is None:
-            # print("1st col is none", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(1.0 - t)
             t = 1.0
         else:
-            print("1st col is some", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(first_collision.time)
             first_collision.unit_a.bounce(first_collision.unit_b)
-            bug_collision = first_collision
             bug_found = True
             t += first_collision.time
-            print(str(t), file=sys.stderr)
     for j in range(len(pod_list)):
         fitness_results.append(pod_list[j].end(checkpoints))
     return fitness_results
