@@ -72,6 +72,11 @@ class Unit(Point):
     def bounce(self, unit):
         return
 
+    def __eq__(self, other):
+        if not isinstance(other, Unit):
+            return NotImplemented
+        return self.x == other.x and self.y == other.y
+
 
 class Pod(Unit):
     def __init__(self, x_in, y_in, vx_in, vy_in, angle_in, id_in, radius_in, num_targets_in, laps_in):
@@ -234,7 +239,7 @@ class Pod(Unit):
         scale_factor = 100 / math.pi
         stretch_factor = 0.002
         far_away = 2000
-        approach_dist = 1200
+        approach_dist = 900
         base = 30
         if distance > far_away:
             thrust = 100
@@ -282,10 +287,10 @@ class Solution:
         return
 
     def score(self):
-        for j in range(len(self.moves1)):
-            self.score1 += self.moves1[j].fitness
-        for j in range(len(self.moves2)):
-            self.score2 += self.moves2[j].fitness
+        # for j in range(len(self.moves1)):
+        #     self.score1 += self.moves1[j].fitness
+        # for j in range(len(self.moves2)):
+        #     self.score2 += self.moves2[j].fitness
         self.overall_fitness = (self.score1 + self.score2) / 2
         return
 
@@ -340,29 +345,53 @@ def auto_trajectory(pod_list, checkpoints, move_list):
 
 
 def play_turn(pod_list, checkpoints):
+    print("Start turn", file=sys.stderr)
+    bug_found = False
+    bug_collision = None
     fitness_results = []
     t: float = 0.0
     while t < 1.0:
         first_collision = None
+        print(str(bug_collision), file=sys.stderr)
         for j in range(len(pod_list)):
             for k in range(j + 1, len(pod_list)):
+                # print("B40 Col", file=sys.stderr)
                 collision = pod_list[j].collision(pod_list[k])
                 if (collision is not None) and (collision.time + t < 1.0) and (
                         (first_collision is None) or (collision.time < first_collision.time)):
+                    # if bug_collision is not None:
+                    #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
+                    #             and collision.time > 0:
                     first_collision = collision
+                    if bug_found:
+                        print(str(bug_collision.unit_a) + " " + str(first_collision.unit_a) + " " + str(bug_collision.unit_b) + " " + str(first_collision.unit_b) + " " + str(first_collision.time), file=sys.stderr)
+                        if first_collision.time <= 0:
+                            first_collision = None
+            # print("B41 Col", file=sys.stderr)
             collision = pod_list[j].collision(checkpoints[pod_list[j].next_target_id])
             if (collision is not None) and (collision.time + t < 1.0) and (
                     (first_collision is None) or (collision.time < first_collision.time)):
+                    # if bug_collision is not None:
+                    #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
+                    #             and collision.time > 0:
                 first_collision = collision
+                if bug_found:
+                    if first_collision.time <= 0:
+                        first_collision = None
         if first_collision is None:
+            # print("1st col is none", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(1.0 - t)
             t = 1.0
         else:
+            print("1st col is some", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(first_collision.time)
             first_collision.unit_a.bounce(first_collision.unit_b)
+            bug_collision = first_collision
+            bug_found = True
             t += first_collision.time
+            print(str(t), file=sys.stderr)
     for j in range(len(pod_list)):
         fitness_results.append(pod_list[j].end(checkpoints))
     return fitness_results
@@ -422,9 +451,9 @@ while True:
     num_turns = 4
     num_solutions: int = 5
     num_parents: int = 3
-    print("Here")
     for i in range(num_solutions):
         solution = Solution()
+        pod_clones = pods
         # For six turns
         for l in range(num_turns):
             # Create list for saving the moves
@@ -451,6 +480,8 @@ while True:
             # Save that move's fitness
             solution.moves1[l].fitness = fitness[0]
             solution.moves2[l].fitness = fitness[1]
+            solution.score1 = pod_clones[0].score(targets)
+            solution.score2 = pod_clones[1].score(targets)
         # Add the solution to the list of solutions
         solutions.append(solution)
     for i in range(num_generations):
@@ -465,7 +496,7 @@ while True:
         # For every parent, mutate the first move then play the rest of the turns
         
             # Mutate the parent's moves
-            mutated_moves = solutions[j].mutate(0.5)
+            mutated_moves = solutions[j].mutate((j/num_parents))
             # Create a child
             child = Solution()
             # Add the mutated moves to the child
