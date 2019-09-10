@@ -39,6 +39,7 @@ class Unit(Point):
         self.num_targets: int = num_targets_in
 
     def collision(self, unit):
+        # print("Collision", file=sys.stderr)
         distance: float = self.distance_squared(unit)
         radius_sum: float = (self.radius + unit.radius) ** 2
         if distance < radius_sum:  # Objects already touching
@@ -65,17 +66,13 @@ class Unit(Point):
             closest_point_distance = closest_point.distance(collision_point)
             if closest_point_distance > length:
                 return None
+                # print(str(t), file=sys.stderr)
             t: float = closest_point_distance / length
             return Collision(self, unit, t)
         return None
 
     def bounce(self, unit):
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, Unit):
-            return NotImplemented
-        return self.x == other.x and self.y == other.y
 
 
 class Pod(Unit):
@@ -100,7 +97,8 @@ class Pod(Unit):
         distance = self.distance(point)
         dx = (point.x - self.x) / distance
         dy = (point.y - self.y) / distance
-        theta: float = math.degrees(dx)
+        theta: float = math.acos(dx)
+        theta = math.degrees(theta)
         if dy < 0:
             theta = 360 - theta
         return theta
@@ -196,7 +194,7 @@ class Pod(Unit):
         return
 
     def score(self, checkpoints):
-        self.fitness = self.checked * 50000 - self.distance(checkpoints[self.next_target_id])
+        self.fitness += self.checked * 50000 - self.distance(checkpoints[self.next_target_id])
         return self.fitness
 
     def output(self, move):
@@ -230,7 +228,8 @@ class Pod(Unit):
         desired_x = 300 * math.cos(unscaled_desired_vect_theta) + target.x
         desired_y = 300 * math.sin(unscaled_desired_vect_theta) + target.y
         # Create point from desired x & y
-        target_point = Point(desired_x, desired_y)
+        target_point = Point(self.x + desired_x - self.x - self.vx, self.y + desired_y - self.y - self.vy)
+        # print(str(desired_x) + "-" + str(self.x) + "-" +  str(self.vx) + "," + str(desired_y) + "-" + str(self.x) + "-" + str(self.vy), file=sys.stderr)
         return target_point
 
     def autopilot_thrust(self, point, style):
@@ -239,8 +238,8 @@ class Pod(Unit):
         scale_factor = 100 / math.pi
         stretch_factor = 0.002
         far_away = 2000
-        approach_dist = 900
-        base = 30
+        approach_dist = 1200
+        base = 45
         if distance > far_away:
             thrust = 100
         elif distance > approach_dist:
@@ -256,6 +255,10 @@ class Pod(Unit):
                 thrust = (100 * (distance / (far_away - approach_dist)) - base) + base
         else:
             thrust = base
+        if self.difference_angle(point) >= 90 and self.difference_angle(point) <= 270:
+            # print(str(self.difference_angle(point)) + ", " + str(self.x) + ", " + str(self.y) + " - " + str(point.x) + ", " + str(point.y), file=sys.stderr)
+            thrust = 0
+        # print(str(self.get_angle(point)) + " | " + str(self.difference_angle(point)) + ", " + str(self.x) + ", " + str(self.y) + " - " + str(point.x) + ", " + str(point.y), file=sys.stderr)
         return thrust
 
     def autopilot(self, target, next_target, style, checkpoints):
@@ -326,6 +329,7 @@ class Move:
         if pmax > 0:
             pmax = 200
         self.thrust = (pmax - pmin) * np.random.random() + pmin
+        # print(str(self.angle), file=sys.stderr)
         return self
 
 
@@ -345,37 +349,53 @@ def auto_trajectory(pod_list, checkpoints, move_list):
 
 
 def play_turn(pod_list, checkpoints):
+    # print("Start turn", file=sys.stderr)
     bug_found = False
+    bug_collision = None
     fitness_results = []
     t: float = 0.0
     while t < 1.0:
         first_collision = None
+        # print(str(bug_collision), file=sys.stderr)
         for j in range(len(pod_list)):
             for k in range(j + 1, len(pod_list)):
+                # print("B40 Col", file=sys.stderr)
                 collision = pod_list[j].collision(pod_list[k])
                 if (collision is not None) and (collision.time + t < 1.0) and (
                         (first_collision is None) or (collision.time < first_collision.time)):
+                    # if bug_collision is not None:
+                    #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
+                    #             and collision.time > 0:
                     first_collision = collision
                     if bug_found:
+                        # print(str(bug_collision.unit_a) + " " + str(first_collision.unit_a) + " " + str(bug_collision.unit_b) + " " + str(first_collision.unit_b) + " " + str(first_collision.time), file=sys.stderr)
                         if first_collision.time <= 0:
                             first_collision = None
+            # print("B41 Col", file=sys.stderr)
             collision = pod_list[j].collision(checkpoints[pod_list[j].next_target_id])
             if (collision is not None) and (collision.time + t < 1.0) and (
                     (first_collision is None) or (collision.time < first_collision.time)):
+                # if bug_collision is not None:
+                #     if bug_collision.unit_a != collision.unit_a and bug_collision.unit_b != bug_collision.unit_b \
+                #             and collision.time > 0:
                 first_collision = collision
                 if bug_found:
                     if first_collision.time <= 0:
                         first_collision = None
         if first_collision is None:
+            # print("1st col is none", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(1.0 - t)
             t = 1.0
         else:
+            # print("1st col is some", file=sys.stderr)
             for j in range(len(pod_list)):
                 pod_list[j].move(first_collision.time)
             first_collision.unit_a.bounce(first_collision.unit_b)
+            bug_collision = first_collision
             bug_found = True
             t += first_collision.time
+            # print(str(t), file=sys.stderr)
     for j in range(len(pod_list)):
         fitness_results.append(pod_list[j].end(checkpoints))
     return fitness_results
@@ -425,16 +445,17 @@ while True:
         pod = Pod(x_2, y_2, vx_2, vy_2, angle_2, next_check_point_id_2, 400, checkpoint_count, laps)
         pods.append(pod)
     pod_clones = pods
+    # print("100 100 100")
 
     # Write an action using print
     # To debug: print("Debug messages...", file=sys.stderr)
 
     # Create five solutions for each pod
-    num_generations: int = 3
+    num_generations: int = 5
     solutions = []
-    num_turns = 4
-    num_solutions: int = 5
-    num_parents: int = 3
+    num_turns = 5
+    num_solutions: int = 10
+    num_parents: int = 5
     for i in range(num_solutions):
         solution = Solution()
         pod_clones = pods
@@ -450,7 +471,7 @@ while True:
                 else:
                     next_target = pod_clones[n].next_target_id + 1
                 # Create one turn
-                current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], l,
+                current_move = pod_clones[n].autopilot(targets[pod_clones[n].next_target_id], targets[next_target], 0,
                                                        targets)
                 # Save the move for that pod for this turn
                 moves.append(current_move)
@@ -464,23 +485,22 @@ while True:
             # Save that move's fitness
             solution.moves1[l].fitness = fitness[0]
             solution.moves2[l].fitness = fitness[1]
-            solution.score1 = pod_clones[0].score(targets)
-            solution.score2 = pod_clones[1].score(targets)
-        # Add the solution to the list of solutions
+            solution.score1 = pod_clones[0].fitness
+            solution.score2 = pod_clones[1].fitness
+            solution.score()
         solutions.append(solution)
     for i in range(num_generations):
         # Sort the solutions to pick best three (avg of score1 + score2)
-        solutions.sort(key=lambda parent: parent.overall_score, reverse=True)
+        solutions.sort(key=lambda parent: parent.overall_fitness, reverse=True)
         # Pick the best 3
-        parents = []
+        parents = solutions[:num_parents]
         children = []
         for j in range(num_parents):
-            # Add one of top 3 to parents
-            parents.append(solutions[j])
-        # For every parent, mutate the first move then play the rest of the turns
-        
+            # For every parent, mutate the first move then play the rest of the turns
+
             # Mutate the parent's moves
-            mutated_moves = solutions[j].mutate((j/num_parents))
+            mutated_moves = parents[j].mutate(j / num_parents)
+            # print(str(mutated_moves[0]), file=sys.stderr)
             # Create a child
             child = Solution()
             # Add the mutated moves to the child
@@ -498,6 +518,19 @@ while True:
         # Pick best 3
 
     # Play the best move
-
+    solutions.sort(key=lambda parent: parent.overall_fitness, reverse=True)
+    best_choices = [solutions[0].moves1[0], solutions[0].moves2[0]]
+    if best_choices[0].thrust > 100:
+        best_choices[0].thrust = 100
+    if best_choices[1].thrust > 100:
+        best_choices[1].thrust = 100
     if first_turn:
+        print(str(int(best_choices[0].point.x)) + " " + str(int(best_choices[0].point.y)) + " BOOST")
+        print(str(int(best_choices[1].point.x)) + " " + str(int(best_choices[1].point.y)) + " BOOST")
         first_turn = False
+    else:
+        print(str(int(best_choices[0].point.x)) + " " + str(int(best_choices[0].point.y)) + " " + str(
+            int(best_choices[0].thrust)))
+        print(str(int(best_choices[1].point.x)) + " " + str(int(best_choices[1].point.y)) + " " + str(
+            int(best_choices[1].thrust)))
+
