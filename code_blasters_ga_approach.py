@@ -255,9 +255,9 @@ class Pod(Unit):
                 thrust = (100 * (distance / (far_away - approach_dist)) - base) + base
         else:
             thrust = base
-        if self.difference_angle(point) >= 90 and self.difference_angle(point) <= 270:
+        if self.difference_angle(point) >= 130 and self.difference_angle(point) <= 230:
             # print(str(self.difference_angle(point)) + ", " + str(self.x) + ", " + str(self.y) + " - " + str(point.x) + ", " + str(point.y), file=sys.stderr)
-            thrust = 0
+            thrust = 20
         # print(str(self.get_angle(point)) + " | " + str(self.difference_angle(point)) + ", " + str(self.x) + ", " + str(self.y) + " - " + str(point.x) + ", " + str(point.y), file=sys.stderr)
         return thrust
 
@@ -451,7 +451,7 @@ while True:
     # To debug: print("Debug messages...", file=sys.stderr)
 
     # Create five solutions for each pod
-    num_generations: int = 5
+    num_generations: int = 6
     solutions = []
     num_turns = 5
     num_solutions: int = 10
